@@ -2,7 +2,12 @@ from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+)
 from pymongo import MongoClient
 import datetime
 
@@ -19,10 +24,13 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # ---------------------------
 # MongoDB Connection
 # ---------------------------
-client = MongoClient("mongodb+srv://test:test123@cluster0.vklgwvt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-db = client["chat_app"]        # database
-users_col = db["users"]        # collection for users
+client = MongoClient(
+    "mongodb+srv://test:test123@cluster0.vklgwvt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+)
+db = client["chat_app"]  # database
+users_col = db["users"]  # collection for users
 messages_col = db["messages"]  # collection for chat messages
+
 
 # ---------------------------
 # Auth APIs
@@ -32,10 +40,10 @@ def register():
     data = request.json
     username = data["username"]
     password = bcrypt.generate_password_hash(data["password"]).decode("utf-8")
-    
+
     if users_col.find_one({"username": username}):
         return jsonify({"msg": "User already exists"}), 400
-    
+
     users_col.insert_one({"username": username, "password": password})
     return jsonify({"msg": "Registered successfully"}), 201
 
@@ -45,11 +53,13 @@ def login():
     data = request.json
     username = data["username"]
     user = users_col.find_one({"username": username})
-    
+
     if not user or not bcrypt.check_password_hash(user["password"], data["password"]):
         return jsonify({"msg": "Invalid credentials"}), 401
-    
-    token = create_access_token(identity=username, expires_delta=datetime.timedelta(hours=1))
+
+    token = create_access_token(
+        identity=username, expires_delta=datetime.timedelta(hours=1)
+    )
     return jsonify({"token": token})
 
 
@@ -57,9 +67,11 @@ def login():
 # WebSocket Events
 # ---------------------------
 
+
 @socketio.on("connect")
 def handle_connect():
     print("Client connected")
+
 
 @socketio.on("message")
 def handle_message(data):
@@ -71,25 +83,34 @@ def handle_message(data):
     }
     """
     # Save to DB
-    messages_col.insert_one({
-        "username": data["username"],
-        "message": data["message"],
-        "room": data.get("room", "general"),
-        "timestamp": datetime.datetime.utcnow()
-    })
-    
+    messages_col.insert_one(
+        {
+            "username": data["username"],
+            "message": data["message"],
+            "room": data.get("room", "general"),
+            "timestamp": datetime.datetime.utcnow(),
+        }
+    )
+
     # Broadcast message to all in room
     emit("message", data, broadcast=True)
+
 
 @socketio.on("join")
 def on_join(data):
     room = data["room"]
     join_room(room)
-    emit("message", {"username": "System", "message": f"{data['username']} joined {room}"}, room=room)
+    emit(
+        "message",
+        {"username": "System", "message": f"{data['username']} joined {room}"},
+        room=room,
+    )
+
 
 @socketio.on("disconnect")
 def handle_disconnect():
     print("Client disconnected")
+
 
 # ---------------------------
 # REST API for Chat History
@@ -104,7 +125,7 @@ def get_messages(room):
         m["timestamp"] = m["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
     return jsonify(msgs)
 
+
 if __name__ == "__main__":
     if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
-
+        socketio.run(app, host="0.0.0.0", port=5000, debug=True)
